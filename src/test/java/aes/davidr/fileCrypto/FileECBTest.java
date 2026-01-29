@@ -37,7 +37,7 @@ class FileECBTest {
         KeySchedule ks = new KeySchedule(key);
 
         // 1) Preferred file path (your original)
-        Path preferred = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
+        Path preferred = Paths.get("src\\test\\java\\aes\\davidr\\test.png");
 
         // 2) Fallback seed path (CHANGE THIS to wherever you keep a test copy)
         Path fallbackSeed = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
@@ -63,6 +63,8 @@ class FileECBTest {
         long t0 = System.nanoTime();
         FileECB.processFile(FileECB.ENCRYPT_MODE, plain.toFile(), enc.toFile(), ks);
         long t1 = System.nanoTime();
+
+        Files.copy(enc, Paths.get("C:\\Users\\reuve\\Desktop\\test.png"), StandardCopyOption.REPLACE_EXISTING);
 
         // --- Measure DECRYPT ---
         long t2 = System.nanoTime();
