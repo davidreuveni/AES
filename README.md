@@ -44,13 +44,9 @@ ECB.ecbProcessBlocks(aes.davidr.engine.AES.ENCRYPT_MODE, padded, ks);
 ECB.ecbProcessBlocks(aes.davidr.engine.AES.DECRYPT_MODE, padded, ks);
 byte[] plain = aes.davidr.modes.Padding.unpadPKCS7(padded);
 ```
-when using string as input to the keyschdual it will hash it and use the hash as te key to use an actual key pass in a byte aray
-
 ### Encrypt/decrypt files (ECB + PKCS#7)
 
 ```java
-import aes.davidr.engine.KeySchedule;
-import aes.davidr.fileCrypto.FileECB;
 
 KeySchedule ks = new KeySchedule("my passphrase");
 FileECB.processFile(FileECB.ENCRYPT_MODE, new java.io.File("plain.bin"), new java.io.File("plain.bin.enc"), ks);
@@ -60,7 +56,6 @@ FileECB.processFile(FileECB.DECRYPT_MODE, new java.io.File("plain.bin.enc"), new
 ### Encrypt/decrypt files with HMAC integrity
 
 ```java
-import aes.davidr.fileCrypto.HMAC;
 
 byte[] key = "my passphrase".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 HMAC.processFile(HMAC.ENCRYPT_MODE, new java.io.File("plain.bin"), new java.io.File("plain.bin.enc"), key);
