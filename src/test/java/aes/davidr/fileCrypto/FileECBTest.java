@@ -23,6 +23,7 @@ class FileECBTest {
     @TempDir
     Path tempDir;
 
+    @SuppressWarnings("unused")
     @Test
     @ResourceLock("ECB_FILE_IO")
     void testProcessFile() throws URISyntaxException, IOException {
@@ -36,10 +37,10 @@ class FileECBTest {
         KeySchedule ks = new KeySchedule(key);
 
         // 1) Preferred file path (your original)
-        Path preferred = Paths.get("C:\\vs\\engine\\src\\test\\java\\aes\\davidr\\test.d");
+        Path preferred = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
 
         // 2) Fallback seed path (CHANGE THIS to wherever you keep a test copy)
-        Path fallbackSeed = Paths.get("C:\\vs\\engine\\test-data\\test.d");
+        Path fallbackSeed = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
 
         // Decide which source to use
         Path source = Files.exists(preferred) ? preferred : fallbackSeed;

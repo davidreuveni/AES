@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 
 public class Main {
 
@@ -17,10 +18,10 @@ public class Main {
         KeySchedule ks = new KeySchedule("");
 
         // 1) Preferred file path (your original)
-        Path preferred = Paths.get("C:\\vs\\engine\\src\\test\\java\\aes\\davidr\\test.d");
+        Path preferred = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
 
         // 2) Fallback seed path (CHANGE THIS to wherever you keep a test copy)
-        Path fallbackSeed = Paths.get("C:\\vs\\engine\\test-data\\test.d");
+        Path fallbackSeed = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
 
         // Work only in temp dir so we don't delete/overwrite real files
         Path tempDir = Files.createTempDirectory("aes-benchmark");
@@ -61,5 +62,17 @@ public class Main {
         System.out.printf("Estimated time for 5 GB:\n");
         System.out.printf("  Encrypt: %.2f s (%.2f min)\n", encETAsec, encETAsec / 60.0);
         System.out.printf("  Decrypt: %.2f s (%.2f min)\n\n", decETAsec, decETAsec / 60.0);
+
+        if (Files.exists(tempDir)) {
+            Files.walk(tempDir)
+                .sorted(Comparator.reverseOrder())
+                .forEach(path -> {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+        }
     }
 }
