@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "AESTest",
+      "request": "launch",
+      "mainClass": "aes.davidr.nonTestsTests.AESTest",
+      "projectName": "engine"
+    },
+    {
+      "type": "java",
+      "name": "Main (JFR)",
+      "request": "launch",
+      "mainClass": "aes.davidr.Main",
+      "cwd": "${workspaceFolder}",
+      "vmArgs": "-XX:StartFlightRecording=filename=${workspaceFolder}/run.jfr,settings=profile,dumponexit=true"
+    }
+  ]
+}
