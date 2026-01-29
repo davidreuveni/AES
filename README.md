@@ -35,9 +35,6 @@ mvn -DskipTests package
 ### Encrypt/decrypt a byte array with ECB
 
 ```java
-import aes.davidr.engine.KeySchedule;
-import aes.davidr.modes.ECB;
-
 KeySchedule ks = new KeySchedule("my passphrase");
 byte[] data = "hello world".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
@@ -47,6 +44,7 @@ ECB.ecbProcessBlocks(aes.davidr.engine.AES.ENCRYPT_MODE, padded, ks);
 ECB.ecbProcessBlocks(aes.davidr.engine.AES.DECRYPT_MODE, padded, ks);
 byte[] plain = aes.davidr.modes.Padding.unpadPKCS7(padded);
 ```
+when using string as input to the keyschdual it will hash it and use the hash as te key to use an actual key pass in a byte aray
 
 ### Encrypt/decrypt files (ECB + PKCS#7)
 
