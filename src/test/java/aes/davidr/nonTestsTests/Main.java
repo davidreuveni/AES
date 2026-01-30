@@ -1,4 +1,4 @@
-package aes.davidr;
+package aes.davidr.nonTestsTests;
 
 import aes.davidr.engine.KeySchedule;
 import aes.davidr.fileCrypto.FileECB;

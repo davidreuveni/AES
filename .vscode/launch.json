@@ -3,6 +3,13 @@
   "configurations": [
     {
       "type": "java",
+      "name": "EncryptFile",
+      "request": "launch",
+      "mainClass": "aes.davidr.nonTestsTests.EncryptFile",
+      "projectName": "engine"
+    },
+    {
+      "type": "java",
       "name": "Main",
       "request": "launch",
       "mainClass": "aes.davidr.Main",
