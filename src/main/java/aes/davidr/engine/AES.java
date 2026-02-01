@@ -155,9 +155,9 @@ public class AES {
         }
         subBytes(s, off);
         shiftRows(s, off);
-        xorRoundKey(s, ks.roundKey(n), off); // last round key is different
+        xorRoundKey(s, ks.roundKey(n), off);
 
-        return s; // return the encrypted block
+        return s;
     }
 
     private static byte[] decryptBlock(byte[] s, KeySchedule ks, int off) {
@@ -175,9 +175,9 @@ public class AES {
         }
         invShiftRows(s, off);
         invSubBytes(s, off);
-        xorRoundKey(s, ks.roundKey(0), off); // last round key is different
+        xorRoundKey(s, ks.roundKey(0), off);
 
-        return s; // return the encrypted block
+        return s;
     }
 
     public static byte[] blockRun(boolean mode, byte[] s, KeySchedule ks, int off) {

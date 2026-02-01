@@ -10,7 +10,7 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class AESCompareAll {
+public class AESCompareAll extends AES{
 
     // Tune: target 256KB–4MB per task (must be multiple of 16)
     static final int TASK_BYTES = 1 * 1024 * 1024; // 1MB per task
@@ -75,7 +75,7 @@ public class AESCompareAll {
 
         for (int off = 0; off < out.length; off += 16) {
             // System.arraycopy(out, off, block, 0, 16);
-            AES.blockRun(encrypt, out, ks, off);  // <-- unchanged blockRun
+            AES.blockRun(encrypt, out, ks, off);
             // System.arraycopy(block, 0, out, off, 16);
         }
         return out;
@@ -107,7 +107,7 @@ public class AESCompareAll {
                 // byte[] block = new byte[16];
                 for (int off = s; off < e; off += 16) {
                     // System.arraycopy(out, off, block, 0, 16);
-                    AES.blockRun(encrypt, out, ks, off); // <-- unchanged blockRun
+                    AES.blockRun(encrypt, out, ks, off);
                     // System.arraycopy(block, 0, out, off, 16);
                 }
             }));

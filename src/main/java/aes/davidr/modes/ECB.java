@@ -5,7 +5,7 @@ import java.util.Arrays;
 import aes.davidr.engine.AES;
 import aes.davidr.engine.KeySchedule;
 
-public final class ECB {
+public final class ECB{
     private static final int BLOCK = 16;
 
     private ECB() {
