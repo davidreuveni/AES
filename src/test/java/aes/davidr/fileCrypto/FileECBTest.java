@@ -37,7 +37,7 @@ class FileECBTest {
         KeySchedule ks = new KeySchedule(key);
 
         // 1) Preferred file path (your original)
-        Path preferred = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
+        Path preferred = Paths.get("src/test/java/aes/davidr/test.d");
 
         // 2) Fallback seed path (CHANGE THIS to wherever you keep a test copy)
         Path fallbackSeed = Paths.get("src\\test\\java\\aes\\davidr\\test.d");
