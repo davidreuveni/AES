@@ -10,7 +10,7 @@ All public entry points are in `aes.davidr.AesCipher` and provide ECB mode with 
 
 ### Constants
 
-- `AesCipher.AES_128`, `AesCipher.AES_192`, `AesCipher.AES_256`
+- `AesCipher.AES_128`, `AesCipher.AES_192`, `AesCipher.AES_256`, `AesCipher.ENCRYPT_MODE`, `AesCipher.DECRYPT_MODE`
 
 ### Byte arrays
 
