@@ -54,16 +54,3 @@ AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, in, enc, "my passphrase", AesCipher.
 - Byte[] keys of length 16/24/32 are treated as raw AES keys; other lengths are derived as AES-128.
 - File operations stream data with PKCS#7 padding.
 
-## Build & test
-
-This is a Maven project. To compile and run tests:
-
-```bash
-mvn test
-```
-
-To build the jar without running tests:
-
-```bash
-mvn -DskipTests package
-```
