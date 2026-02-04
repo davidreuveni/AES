@@ -13,11 +13,8 @@ public final class ECB{
 
     /** In-place single-block ECB (fast, minimal checks). */
     public static byte[] ecbProcessBlock(boolean mode, byte[] in, KeySchedule ks, int offset) {
-        if (in == null || ks == null)
-            throw new IllegalArgumentException("null");
-        if (offset < 0 || offset + BLOCK > in.length)
-            throw new IllegalArgumentException("bad offset");
-        return AES.blockRun(mode, in, ks, offset); // in-place
+        ecbProcessBlocks(mode, in, ks, 0, 16);
+        return in;
     }
 
     /**

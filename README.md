@@ -1,20 +1,58 @@
 # AES Engine
 
-A small Java AES implementation with supporting utilities for ECB mode, PKCS#7 padding, file encryption, and optional HMAC integrity checks. The project includes a Maven build and unit tests for core primitives.
+This project is a small, self-contained Java AES implementation focused on a simple public API. It is intended for learning and basic utility use, with a clear, minimal surface area for encryption/decryption of byte arrays and files.
 
-## Features
+If you only need to encrypt or decrypt data, use `aes.davidr.AesCipher`. The rest of the codebase contains lower-level primitives and helpers.
 
-- AES block cipher implementation with key expansion.
-- ECB mode block processing with PKCS#7 padding helpers.
-- File encryption/decryption helpers (streamed, block-aligned).
-- Optional file format with HMAC-SHA256 integrity tags.
+## Public API
 
-## Project layout
+All public entry points are in `aes.davidr.AesCipher` and provide ECB mode with PKCS#7 padding.
 
-- `src/main/java/aes/davidr/engine`: Core AES primitives (S-box tables, Galois field ops, key schedule, block cipher).
-- `src/main/java/aes/davidr/modes`: ECB mode and padding utilities.
-- `src/main/java/aes/davidr/fileCrypto`: File encryption helpers and HMAC wrapper.
-- `src/test/java`: Unit tests and small benchmark/utility classes.
+### Constants
+
+- `AesCipher.AES_128`, `AesCipher.AES_192`, `AesCipher.AES_256`
+
+### Byte arrays
+
+```java
+import aes.davidr.AesCipher;
+
+byte[] data = "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+// default AES-128, key derived from string
+byte[] encrypted = AesCipher.cryptBytes(AesCipher.ENCRYPT_MODE, data, "my passphrase");
+byte[] decrypted = AesCipher.cryptBytes(AesCipher.DECRYPT_MODE, encrypted, "my passphrase");
+
+// explicit key size (AES-256)
+byte[] encrypted256 = AesCipher.cryptBytes(AesCipher.ENCRYPT_MODE, data, "my passphrase", AesCipher.AES_256);
+
+// raw key bytes: if length is 16/24/32 it's used directly; otherwise it is derived as AES-128
+byte[] rawKey = new byte[16];
+byte[] encryptedRaw = AesCipher.cryptBytes(AesCipher.ENCRYPT_MODE, data, rawKey);
+```
+
+### Files
+
+```java
+import aes.davidr.AesCipher;
+import java.io.File;
+
+File in = new File("plain.bin");
+File enc = new File("plain.bin.enc");
+File dec = new File("plain.bin.dec");
+
+AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, in, enc, "my passphrase");
+AesCipher.cryptFile(AesCipher.DECRYPT_MODE, enc, dec, "my passphrase");
+
+// explicit key size (AES-192)
+AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, in, enc, "my passphrase", AesCipher.AES_192);
+```
+
+## Notes
+
+- String keys are derived via SHA-256 and truncated to the selected AES key size.
+- Byte[] keys of length 16/24/32 are treated as raw AES keys; other lengths are derived as AES-128.
+- File operations stream data with PKCS#7 padding.
 
 ## Build & test
 
@@ -29,40 +67,3 @@ To build the jar without running tests:
 ```bash
 mvn -DskipTests package
 ```
-
-## Usage examples
-
-### Encrypt/decrypt a byte array with ECB
-
-```java
-KeySchedule ks = new KeySchedule("my passphrase");
-byte[] data = "hello world".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
-byte[] padded = aes.davidr.modes.Padding.padPKCS7(data);
-ECB.ecbProcessBlocks(aes.davidr.engine.AES.ENCRYPT_MODE, padded, ks);
-
-ECB.ecbProcessBlocks(aes.davidr.engine.AES.DECRYPT_MODE, padded, ks);
-byte[] plain = aes.davidr.modes.Padding.unpadPKCS7(padded);
-```
-### Encrypt/decrypt files (ECB + PKCS#7)
-
-```java
-
-KeySchedule ks = new KeySchedule("my passphrase");
-FileECB.processFile(FileECB.ENCRYPT_MODE, new java.io.File("plain.bin"), new java.io.File("plain.bin.enc"), ks);
-FileECB.processFile(FileECB.DECRYPT_MODE, new java.io.File("plain.bin.enc"), new java.io.File("plain.bin.dec"), ks);
-```
-
-### Encrypt/decrypt files with HMAC integrity
-
-```java
-
-byte[] key = "my passphrase".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-HMAC.processFile(HMAC.ENCRYPT_MODE, new java.io.File("plain.bin"), new java.io.File("plain.bin.enc"), key);
-HMAC.processFile(HMAC.DECRYPT_MODE, new java.io.File("plain.bin.enc"), new java.io.File("plain.bin.dec"), key);
-```
-
-## Notes
-
-- `KeySchedule` accepts 16/24/32-byte keys for AES-128/192/256. When constructed from a string, the key is derived via SHA-256 and truncated to the chosen key size.
-- The file helpers buffer data in memory but stream the encryption/decryption process for large files.
