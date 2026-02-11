@@ -17,11 +17,13 @@ class GaloisField {
         return (byte) ((mul2(b) ^ b) & 0xFF);
     }
 
+    @Deprecated
     static byte mul4(byte b) {
         byte mul4 = mul2(mul2(b));
         return (byte) (mul4 & 0xFF);
     }
-
+    
+    @Deprecated
     static byte mul8(byte b) {
         return mul2(mul4(b));
     }
