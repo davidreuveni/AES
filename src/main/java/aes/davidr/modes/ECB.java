@@ -13,6 +13,8 @@ public final class ECB{
 
     /** In-place single-block ECB (fast, minimal checks). */
     public static byte[] ecbProcessBlock(boolean mode, byte[] in, KeySchedule ks, int offset) {
+        if(offset<0)throw new IllegalArgumentException("bad offset negative");
+        if((in.length-offset)<16)throw new IllegalArgumentException("too small of an input");
         ecbProcessBlocks(mode, in, ks, 0, 16);
         return in;
     }
@@ -22,7 +24,7 @@ public final class ECB{
      */
     public static void ecbProcessBlocks(boolean mode, byte[] in, KeySchedule ks, int offset, int len) {
         if (in == null || ks == null)
-            throw new IllegalArgumentException("null");
+            throw new NullPointerException("null");
         if ((offset | len) < 0 || offset + len > in.length)
             throw new IllegalArgumentException("bad range");
         if ((len & (BLOCK - 1)) != 0) // if len is multiple of 16, its last 4 bits are 0 len & 15 will be 0 only for

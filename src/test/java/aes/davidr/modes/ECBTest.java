@@ -46,8 +46,8 @@ public class ECBTest {
 
         KeySchedule ks = new KeySchedule(key);
         KeySchedule ksNULL = null;
-        assertThrows(IllegalArgumentException.class, () -> ECB.ecbProcessBlock(AES.DECRYPT_MODE, pt, ksNULL, 0));
-        assertThrows(IllegalArgumentException.class, () -> ECB.ecbProcessBlock(AES.DECRYPT_MODE, ptNULL, ks, 0));
+        assertThrows(NullPointerException.class, () -> ECB.ecbProcessBlock(AES.DECRYPT_MODE, pt, ksNULL, 0));
+        assertThrows(NullPointerException.class, () -> ECB.ecbProcessBlock(AES.DECRYPT_MODE, ptNULL, ks, 0));
     }
 
     @Test
