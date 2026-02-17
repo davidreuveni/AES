@@ -1,5 +1,6 @@
 package aes.davidr.engine;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 
 import org.junit.jupiter.api.Test;
@@ -39,5 +40,6 @@ public class KeyScheduleTest {
     void testKeySchedule() {
         KeySchedule ks1 = new KeySchedule("aaaa", KeySchedule.AES_256);
         KeySchedule ks2 = new KeySchedule("aaaa");
+        assertNotEquals(ks1,ks2);
     }
 }
