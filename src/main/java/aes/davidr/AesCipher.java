@@ -108,16 +108,23 @@ public final class AesCipher {
 
     /**
      * Processes a file with AES in ECB mode using raw key bytes.
-     * Key length 16/24/32 selects AES-128/192/256 automatically via {@code keyScheduleForBytes}.
-     * File streaming and block handling are delegated to {@link FileECB#processFile}.
+     * When {@code hmac} is {@code true}, processing is delegated to {@link HMAC#processFile}.
+     * When {@code hmac} is {@code false}, key length 16/24/32 selects AES-128/192/256
+     * automatically via {@code keyScheduleForBytes}, and file processing is delegated to
+     * {@link FileECB#processFile}.
      *
      * @param encrypt use {@link #ENCRYPT_MODE} to encrypt or {@link #DECRYPT_MODE} to decrypt
+     * @param hmac {@code true} to use authenticated file processing, {@code false} to use plain ECB file processing
      * @param inFile input file
      * @param outFile output file
      * @param key raw key bytes
-     * @throws IOException if reading or writing a file fails
+     * @throws Exception if file processing fails or authentication checks fail
      */
-    public static void cryptFile(boolean encrypt, File inFile, File outFile, byte[] key) throws IOException {
+    public static void cryptFile(boolean encrypt, boolean hmac, File inFile, File outFile, byte[] key) throws Exception {
+        if (hmac){
+            HMAC.processFile(encrypt, inFile, outFile, key);
+        }
+        else
         FileECB.processFile(encrypt, inFile, outFile, keyScheduleForBytes(key));
     }
 
@@ -168,15 +175,6 @@ public final class AesCipher {
         HMAC.cipherStream(encrypt, in, out, key);
     }
 
-    /**
-     * Creates a {@link KeySchedule} from raw key bytes.
-     * For 16/24/32-byte keys, the size directly maps to AES-128/192/256.
-     * Any other non-null size falls back to AES-128 scheduling.
-     *
-     * @param key raw key bytes
-     * @return key schedule for AES operations
-     * @throws IllegalArgumentException if {@code key} is {@code null}
-     */
     private static KeySchedule keyScheduleForBytes(byte[] key) {
         if (key == null)
             throw new IllegalArgumentException("key is null");

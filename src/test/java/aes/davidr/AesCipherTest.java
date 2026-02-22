@@ -7,6 +7,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -95,6 +96,87 @@ class AesCipherTest {
     }
 
     @Test
+    void cryptFile_withByteKeyAndHmacMode_roundTrip() throws Exception {
+        byte[] plain = "another file payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8); // 24 bytes
+
+        File in = tempDir.resolve("in2.bin").toFile();
+        File enc = tempDir.resolve("enc2.bin").toFile();
+        File out = tempDir.resolve("out2.bin").toFile();
+        Files.write(in.toPath(), plain);
+
+        AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, true, in, enc, key);
+        AesCipher.cryptFile(AesCipher.DECRYPT_MODE, true, enc, out, key);
+
+        assertArrayEquals(plain, Files.readAllBytes(out.toPath()));
+    }
+
+    @Test
+    void cryptFile_withByteKeyAndHmacMode_noSigOnDec() throws Exception {
+        byte[] plain = "another file payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8); // 24 bytes
+
+        File in = tempDir.resolve("in2.bin").toFile();
+        File enc = tempDir.resolve("enc2.bin").toFile();
+        File out = tempDir.resolve("out2.bin").toFile();
+        Files.write(in.toPath(), plain);
+
+        AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, false, in, enc, key);
+        assertThrows(IOException.class, () -> AesCipher.cryptFile(AesCipher.DECRYPT_MODE, true, enc, out, key));
+
+    }
+
+    @Test
+    void cryptFile_withByteKeyAndHmacMode_ChangedFileOnDec() throws Exception {
+        byte[] plain = "another file payloadanother file payloadanother file payloadanother file payloadanother file payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8); // 24 bytes
+
+        File in = tempDir.resolve("in2.bin").toFile();
+        File enc = tempDir.resolve("enc2.bin").toFile();
+        File out = tempDir.resolve("out2.bin").toFile();
+        Files.write(in.toPath(), plain);
+        AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, true, in, enc, key);
+        
+        flipOneBit(enc, 20, 3);
+
+        assertThrows(SecurityException.class, () -> AesCipher.cryptFile(AesCipher.DECRYPT_MODE, true, enc, out, key));
+
+    }
+
+    @Test
+    void cryptFile_withByteKeyAndHmacMode_WrongKey() throws Exception {
+        byte[] plain = "another file payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8); // 24 bytes
+        byte[] key2 = "abcdefghijklmnopqrstuvwz".getBytes(StandardCharsets.UTF_8); // 24 bytes
+
+        File in = tempDir.resolve("in2.bin").toFile();
+        File enc = tempDir.resolve("enc2.bin").toFile();
+        File out = tempDir.resolve("out2.bin").toFile();
+        Files.write(in.toPath(), plain);
+        AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, true, in, enc, key);
+
+        assertThrows(SecurityException.class, () -> AesCipher.cryptFile(AesCipher.DECRYPT_MODE, true, enc, out, key2));
+
+    }
+
+    @Test
+    void cryptFile_withByteKeyAndHmacMode_ShorterFile() throws Exception {
+        byte[] plain = "another file payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "abcdefghijklmnopqrstuvwx".getBytes(StandardCharsets.UTF_8); // 24 bytes
+
+        File in = tempDir.resolve("in2.bin").toFile();
+        File enc = tempDir.resolve("enc2.bin").toFile();
+        File out = tempDir.resolve("out2.bin").toFile();
+        Files.write(in.toPath(), plain);
+        AesCipher.cryptFile(AesCipher.ENCRYPT_MODE, true, in, enc, key);
+
+        truncateByOneByte(enc);
+
+        assertThrows(SecurityException.class, () -> AesCipher.cryptFile(AesCipher.DECRYPT_MODE, true, enc, out, key));
+
+    }
+
+    @Test
     void cipherStream_withByteKey_roundTrip() throws Exception {
         byte[] plain = "stream payload with authentication".getBytes(StandardCharsets.UTF_8);
         byte[] key = "0123456789abcdef".getBytes(StandardCharsets.UTF_8); // 16 bytes
@@ -141,6 +223,26 @@ class AesCipherTest {
                         new ByteArrayOutputStream(),
                         wrongKey));
     }
+
+    static void flipOneBit(File f, long offset, int bitIndex0to7) throws Exception {
+    if (bitIndex0to7 < 0 || bitIndex0to7 > 7) throw new IllegalArgumentException("bit index 0..7");
+    try (RandomAccessFile raf = new RandomAccessFile(f, "rw")) {
+        raf.seek(offset);
+        int b = raf.read();
+        if (b == -1) throw new IllegalArgumentException("Offset out of file range");
+        int mask = 1 << bitIndex0to7;
+        raf.seek(offset);
+        raf.write(b ^ mask);
+    }
+}
+
+static void truncateByOneByte(File f) throws IOException {
+    try (RandomAccessFile raf = new RandomAccessFile(f, "rw")) {
+        long len = raf.length();
+        if (len == 0) throw new IllegalArgumentException("File is empty");
+        raf.setLength(len - 1);
+    }
+}
 
     @AfterEach
     void cleanup() throws IOException {
