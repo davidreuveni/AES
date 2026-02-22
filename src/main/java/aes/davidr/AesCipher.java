@@ -2,9 +2,12 @@ package aes.davidr;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import aes.davidr.engine.KeySchedule;
 import aes.davidr.fileCrypto.FileECB;
+import aes.davidr.fileCrypto.HMAC;
 import aes.davidr.modes.ECB;
 
 /**
@@ -19,10 +22,15 @@ import aes.davidr.modes.ECB;
  * and optionally use overloads with an explicit AES mode constant.
  */
 public final class AesCipher {
+    /** AES with 128-bit key size mode constant. */
     public static final int AES_128 = KeySchedule.AES_128;
+    /** AES with 192-bit key size mode constant. */
     public static final int AES_192 = KeySchedule.AES_192;
+    /** AES with 256-bit key size mode constant. */
     public static final int AES_256 = KeySchedule.AES_256;
+    /** Operation flag for encryption. */
     public static final boolean ENCRYPT_MODE = true;
+    /** Operation flag for decryption. */
     public static final boolean DECRYPT_MODE = false;
 
     /**
@@ -146,6 +154,21 @@ public final class AesCipher {
     }
 
     /**
+     * Processes stream data using AES-ECB with an appended HMAC-SHA256 authentication tag.
+     * In encrypt mode, the method writes container fields, ciphertext, and tag to {@code out}.
+     * In decrypt mode, the method verifies authenticity before emitting plaintext.
+     *
+     * @param encrypt use {@link #ENCRYPT_MODE} to encrypt or {@link #DECRYPT_MODE} to decrypt
+     * @param in source input stream
+     * @param out destination output stream
+     * @param key raw key bytes used to derive encryption and MAC keys
+     * @throws Exception if stream processing fails or authentication validation fails during decryption
+     */
+    public static void cipherStream(boolean encrypt, InputStream in, OutputStream out, byte[] key) throws Exception {
+        HMAC.cipherStream(encrypt, in, out, key);
+    }
+
+    /**
      * Creates a {@link KeySchedule} from raw key bytes.
      * For 16/24/32-byte keys, the size directly maps to AES-128/192/256.
      * Any other non-null size falls back to AES-128 scheduling.
@@ -163,5 +186,3 @@ public final class AesCipher {
         return new KeySchedule(key, AES_128);
     }
 }
-
-

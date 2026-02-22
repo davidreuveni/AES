@@ -8,147 +8,188 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
-public class HMAC {
+/**
+ * Streaming format (tag at end):
+ *   [fields (MAGIC+VERSION+MODE)] [ciphertext ...] [tag (32)]
+ *
+ * HMAC input:
+ *   fields || ciphertext
+ *
+ * Notes:
+ * - No plaintext length in header (stream-friendly).
+ * - Decrypt spools ciphertext to a temp file to verify MAC before emitting plaintext.
+ */
+public final class HMAC {
+
     public static final boolean ENCRYPT_MODE = true;
     public static final boolean DECRYPT_MODE = false;
 
     private static final byte[] MAGIC   = new byte[]{'D','R','E','C','B','M','A','C'}; // 8 bytes
     private static final byte   VERSION = 1;
     private static final byte   MODE_ECB = 0;
-    private static final int TAG_LEN = 32; // HMAC-SHA256 output length
-    static final int FIELDS_LEN = 8 + 1 + 1 + 8;
-    static final int HEADER_LEN = FIELDS_LEN + TAG_LEN;
-    private static final int TAG_OFFSET = FIELDS_LEN;
+
+    private static final int TAG_LEN    = 32;        // HMAC-SHA256
+    private static final int BUF        = 64 * 1024; // IO buffer
+
+    // fields = MAGIC(8) + VERSION(1) + MODE(1)
+    static final int FIELDS_LEN = 8 + 1 + 1;
 
     public static void processFile(boolean mode, File in, File out, byte[] mainKey) throws Exception {
         if (mode) {
-            encrypt(in, out, mainKey);
+            try (InputStream is = new BufferedInputStream(new FileInputStream(in), BUF);
+                 OutputStream os = new BufferedOutputStream(new FileOutputStream(out), BUF)) {
+                encryptIStoOS(is, os, mainKey);
+            }
         } else {
-            decrypt(in, out, mainKey);
+            try (InputStream is = new BufferedInputStream(new FileInputStream(in), BUF);
+                 OutputStream os = new BufferedOutputStream(new FileOutputStream(out), BUF)) {
+                decryptIStoOS(is, os, mainKey);
+            }
         }
     }
 
-    private static void encrypt(File plainIn, File outEnc, byte[] mainKey) throws Exception {
+    public static void cipherStream(boolean mode, InputStream in, OutputStream out, byte[] mainKey) throws Exception {
+        if (mode) encryptIStoOS(in, out, mainKey);
+        else decryptIStoOS(in, out, mainKey);
+    }
+
+    /**
+     * Encrypt plaintext stream -> writes fields + ciphertext + tag to outEnc.
+     * Does NOT close the provided streams.
+     */
+    public static void encryptIStoOS(InputStream plainIn, OutputStream outEnc, byte[] mainKey) throws Exception {
         if (plainIn == null || outEnc == null || mainKey == null) throw new IllegalArgumentException("null");
+
         DerivedKeys dk = deriveKeys(mainKey);
-
-        long plainLen = plainIn.length();
-        byte[] fields = buildFields(plainLen);
-
-        try (OutputStream os = new BufferedOutputStream(new FileOutputStream(outEnc), 64 * 1024)) {
-            os.write(fields);
-            os.write(new byte[TAG_LEN]); // placeholder
-        }
+        byte[] fields = buildFields();
 
         Mac mac = initHmac(dk.macKey);
         mac.update(fields);
 
-        try (InputStream is = new BufferedInputStream(new FileInputStream(plainIn), 64 * 1024);
-             OutputStream fosAppend = new FileOutputStream(outEnc, true);
-             OutputStream osCipher = new BufferedOutputStream(new MacOutputStream(fosAppend, mac), 64 * 1024)) {
+        // Avoid closing caller's OutputStream
+        OutputStream encOut = new BufferedOutputStream(new NonClosingOutputStream(outEnc), BUF);
 
-            // uses your existing stream encryption logic
-            FileECB.encryptIStoOS(is, osCipher, dk.ks);
-            osCipher.flush();
+        // 1) write fields
+        encOut.write(fields);
+
+        // 2) stream ciphertext while updating MAC
+        try (OutputStream macOut = new BufferedOutputStream(new MacOutputStream(encOut, mac), BUF)) {
+            FileECB.encryptIStoOS(plainIn, macOut, dk.ks);
+            macOut.flush();
         }
 
-        // 4) Finalize HMAC and write tag into the header (seek)
+        // 3) finalize + write tag at end
         byte[] tag = mac.doFinal();
-        writeTagIntoHeader(outEnc, tag);
+        encOut.write(tag);
+        encOut.flush();
     }
 
-    private static void decrypt(File encIn, File plainOut, byte[] mainKey) throws Exception {
+    /**
+     * Decrypt encrypted stream (fields + ciphertext + tag) -> writes plaintext to plainOut.
+     * Verifies HMAC BEFORE decrypting (spools ciphertext to temp file).
+     * Does NOT close the provided streams.
+     */
+    public static void decryptIStoOS(InputStream encIn, OutputStream plainOut, byte[] mainKey) throws Exception {
         if (encIn == null || plainOut == null || mainKey == null) throw new IllegalArgumentException("null");
+
         DerivedKeys dk = deriveKeys(mainKey);
 
-        Header h = readAndValidateHeader(encIn);
-        verifyHmacOrThrow(encIn, h, dk.macKey);
+        InputStream in = new BufferedInputStream(encIn, BUF);
 
-        try (InputStream is = new BufferedInputStream(new FileInputStream(encIn), 64 * 1024);
-             OutputStream os = new BufferedOutputStream(new FileOutputStream(plainOut), 64 * 1024)) {
-
-            skipFully(is, HEADER_LEN);
-            FileECB.decryptIStoOS(is, os, dk.ks);
-        }
-
-        if (plainOut.length() != h.plaintextLen) {
-            throw new IOException("Plaintext length mismatch (wrong key or internal error).");
-        }
-    }
-
-    private static byte[] buildFields(long plaintextLen) {
-        ByteBuffer bb = ByteBuffer.allocate(FIELDS_LEN);
-        bb.put(MAGIC);
-        bb.put(VERSION);
-        bb.put(MODE_ECB);
-        bb.putLong(plaintextLen);
-        return bb.array();
-    }
-
-    private static Header readAndValidateHeader(File encIn) throws IOException {
-        long fileLen = encIn.length();
-        if (fileLen < HEADER_LEN) throw new IOException("Invalid file: too small");
-
+        // 1) read/validate fields
         byte[] fields = new byte[FIELDS_LEN];
-        byte[] tag = new byte[TAG_LEN];
+        readFully(in, fields, 0, fields.length);
+        validateFields(fields);
 
-        try (InputStream is = new BufferedInputStream(new FileInputStream(encIn), 64 * 1024)) {
-            readFully(is, fields, 0, fields.length);
-            readFully(is, tag, 0, tag.length);
-        }
+        // 2) MAC over fields || ciphertext
+        Mac mac = initHmac(dk.macKey);
+        mac.update(fields);
 
-        // validate magic
-        for (int i = 0; i < MAGIC.length; i++) {
-            if (fields[i] != MAGIC[i]) throw new IOException("Invalid file: bad MAGIC");
-        }
+        // 3) Spool ciphertext to temp while keeping last TAG_LEN bytes as tag (ring buffer)
+        File tmp = File.createTempFile("hmac_ecb_cipher_", ".bin");
+        // Optional: best-effort cleanup if JVM exits unexpectedly
+        tmp.deleteOnExit();
 
-        // validate version
-        byte ver = fields[8];
-        if (ver != VERSION) throw new IOException("Unsupported VERSION: " + ver);
+        byte[] ring = new byte[TAG_LEN];
+        int filled = 0;
+        int pos = 0; // next index to evict/overwrite when ring full
 
-        // validate mode
-        byte mode = fields[9];
-        if (mode != MODE_ECB) throw new IOException("Unsupported MODE: " + mode);
+        long bytesAfterFields = 0;
 
-        // parse plaintext length
-        long plainLen = ByteBuffer.wrap(fields, 10, 8).getLong();
-        if (plainLen < 0) throw new IOException("Invalid plaintext length in header");
-
-        return new Header(fields, tag, plainLen);
-    }
-
-    /** Overwrite the placeholder tag at TAG_OFFSET. */
-    private static void writeTagIntoHeader(File outEnc, byte[] tag) throws IOException {
-        if (tag.length != TAG_LEN) throw new IllegalArgumentException("bad tag len");
-        try (RandomAccessFile raf = new RandomAccessFile(outEnc, "rw")) {
-            raf.seek(TAG_OFFSET);
-            raf.write(tag);
-        }
-    }
-
-    private static void verifyHmacOrThrow(File encIn, Header h, byte[] macKey) throws Exception {
-        Mac mac = initHmac(macKey);
-
-        // HMAC input: fields || ciphertext
-        mac.update(h.fields);
-
-        // stream ciphertext bytes (from HEADER_LEN to EOF) into mac
-        try (InputStream is = new BufferedInputStream(new FileInputStream(encIn), 64 * 1024)) {
-            skipFully(is, HEADER_LEN);
-
-            byte[] buf = new byte[64 * 1024];
+        try (OutputStream tmpOut = new BufferedOutputStream(new FileOutputStream(tmp), BUF)) {
+            byte[] buf = new byte[BUF];
             int n;
-            while ((n = is.read(buf)) != -1) {
-                mac.update(buf, 0, n);
+            while ((n = in.read(buf)) != -1) {
+                bytesAfterFields += n;
+                for (int i = 0; i < n; i++) {
+                    byte b = buf[i];
+                    if (filled < TAG_LEN) {
+                        ring[filled++] = b;
+                        if (filled == TAG_LEN) pos = 0;
+                    } else {
+                        // evict oldest -> ciphertext
+                        byte c = ring[pos];
+                        tmpOut.write(c);
+                        mac.update(c);
+
+                        // store new byte
+                        ring[pos] = b;
+                        pos++;
+                        if (pos == TAG_LEN) pos = 0;
+                    }
+                }
             }
+            tmpOut.flush();
+        }
+
+        if (bytesAfterFields < TAG_LEN) {
+            safeDelete(tmp);
+            throw new IOException("Invalid file: missing tag (too short)");
+        }
+
+        // reconstruct stored tag in correct order from ring buffer
+        byte[] storedTag = new byte[TAG_LEN];
+        for (int i = 0; i < TAG_LEN; i++) {
+            storedTag[i] = ring[(pos + i) % TAG_LEN];
         }
 
         byte[] computed = mac.doFinal();
 
-        // constant-time compare
-        if (!MessageDigest.isEqual(computed, h.tag)) {
-            throw new SecurityException("HMAC verification failed (file modified or wrong key).");
+        if (!MessageDigest.isEqual(computed, storedTag)) {
+            safeDelete(tmp);
+            throw new SecurityException("HMAC verification failed (modified file or wrong key).");
         }
+
+        // 4) decrypt ciphertext from temp -> plaintext output
+        OutputStream out = new BufferedOutputStream(new NonClosingOutputStream(plainOut), BUF);
+        try (InputStream cipherIn = new BufferedInputStream(new FileInputStream(tmp), BUF)) {
+            FileECB.decryptIStoOS(cipherIn, out, dk.ks);
+            out.flush();
+        } finally {
+            safeDelete(tmp);
+        }
+    }
+
+
+    private static byte[] buildFields() {
+        ByteBuffer bb = ByteBuffer.allocate(FIELDS_LEN);
+        bb.put(MAGIC);
+        bb.put(VERSION);
+        bb.put(MODE_ECB);
+        return bb.array();
+    }
+
+    private static void validateFields(byte[] fields) throws IOException {
+        // magic
+        for (int i = 0; i < MAGIC.length; i++) {
+            if (fields[i] != MAGIC[i]) throw new IOException("Invalid file: bad MAGIC");
+        }
+        // version
+        byte ver = fields[8];
+        if (ver != VERSION) throw new IOException("Unsupported VERSION: " + ver);
+        // mode
+        byte mode = fields[9];
+        if (mode != MODE_ECB) throw new IOException("Unsupported MODE: " + mode);
     }
 
     private static Mac initHmac(byte[] macKey) throws Exception {
@@ -159,25 +200,11 @@ public class HMAC {
 
     private static DerivedKeys deriveKeys(byte[] mainKey) throws Exception {
         MessageDigest sha = MessageDigest.getInstance("SHA-256");
-
         sha.update(mainKey);
         sha.update((byte) 0x02);
         byte[] macKey32 = sha.digest();
 
         return new DerivedKeys(new KeySchedule(mainKey), macKey32);
-    }
-
-    private static void skipFully(InputStream is, long bytes) throws IOException {
-        long left = bytes;
-        while (left > 0) {
-            long s = is.skip(left);
-            if (s <= 0) { // skip() is allowed to return 0, so fallback to read
-                if (is.read() == -1) throw new EOFException("Unexpected EOF while skipping");
-                left--;
-            } else {
-                left -= s;
-            }
-        }
     }
 
     private static void readFully(InputStream is, byte[] b, int off, int len) throws IOException {
@@ -189,7 +216,10 @@ public class HMAC {
         }
     }
 
-    /** OutputStream wrapper: every write also updates the Mac with the same ciphertext bytes. */
+    private static void safeDelete(File f) {
+        try { if (f != null) f.delete(); } catch (Exception ignored) {}
+    }
+
     private static final class MacOutputStream extends FilterOutputStream {
         private final Mac mac;
 
@@ -209,20 +239,14 @@ public class HMAC {
         }
     }
 
+    private static final class NonClosingOutputStream extends FilterOutputStream {
+        NonClosingOutputStream(OutputStream out) { super(out); }
+        @Override public void close() throws IOException { flush(); } // don't close underlying
+    }
+
     private static final class DerivedKeys {
         final KeySchedule ks;
         final byte[] macKey;
         DerivedKeys(KeySchedule ks, byte[] macKey) { this.ks = ks; this.macKey = macKey; }
-    }
-
-    private static final class Header {
-        final byte[] fields;    // authenticated fields bytes
-        final byte[] tag;       // stored tag from header
-        final long plaintextLen;
-        Header(byte[] fields, byte[] tag, long plaintextLen) {
-            this.fields = fields;
-            this.tag = tag;
-            this.plaintextLen = plaintextLen;
-        }
     }
 }

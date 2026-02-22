@@ -3,6 +3,8 @@ package aes.davidr;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -90,6 +92,54 @@ class AesCipherTest {
         AesCipher.cryptFile(AesCipher.DECRYPT_MODE, enc, out, key, AesCipher.AES_192);
 
         assertArrayEquals(plain, Files.readAllBytes(out.toPath()));
+    }
+
+    @Test
+    void cipherStream_withByteKey_roundTrip() throws Exception {
+        byte[] plain = "stream payload with authentication".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "0123456789abcdef".getBytes(StandardCharsets.UTF_8); // 16 bytes
+
+        ByteArrayOutputStream encryptedOut = new ByteArrayOutputStream();
+        AesCipher.cipherStream(
+                AesCipher.ENCRYPT_MODE,
+                new ByteArrayInputStream(plain),
+                encryptedOut,
+                key);
+
+        byte[] encrypted = encryptedOut.toByteArray();
+
+        ByteArrayOutputStream decryptedOut = new ByteArrayOutputStream();
+        AesCipher.cipherStream(
+                AesCipher.DECRYPT_MODE,
+                new ByteArrayInputStream(encrypted),
+                decryptedOut,
+                key);
+
+        assertArrayEquals(plain, decryptedOut.toByteArray());
+    }
+
+    @Test
+    void cipherStream_withWrongKey_throwsSecurityException() throws Exception {
+        byte[] plain = "authenticated stream payload".getBytes(StandardCharsets.UTF_8);
+        byte[] key = "0123456789abcdef".getBytes(StandardCharsets.UTF_8); // 16 bytes
+        byte[] wrongKey = "fedcba9876543210".getBytes(StandardCharsets.UTF_8); // 16 bytes
+
+        ByteArrayOutputStream encryptedOut = new ByteArrayOutputStream();
+        AesCipher.cipherStream(
+                AesCipher.ENCRYPT_MODE,
+                new ByteArrayInputStream(plain),
+                encryptedOut,
+                key);
+
+        byte[] encrypted = encryptedOut.toByteArray();
+
+        assertThrows(
+                SecurityException.class,
+                () -> AesCipher.cipherStream(
+                        AesCipher.DECRYPT_MODE,
+                        new ByteArrayInputStream(encrypted),
+                        new ByteArrayOutputStream(),
+                        wrongKey));
     }
 
     @AfterEach
