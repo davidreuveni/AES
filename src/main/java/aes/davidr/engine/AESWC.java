@@ -14,27 +14,29 @@ public class AESWC {
         AVAILABLE = loaded;
     }
 
-    private static native void encryptBlock(byte[] in, byte[] expandedKeys, int rounds, int off);
-    private static native void decryptBlock(byte[] in, byte[] expandedKeys, int rounds, int off);
+    private static native void encryptBlock(byte[] in, byte[] expandedKeys, int rounds, int offset);
+    private static native void decryptBlock(byte[] in, byte[] expandedKeys, int rounds, int offset);
+    private static native void encryptBlocks(byte[] in, byte[] expandedKeys, int rounds, int offset, int len);
+    private static native void decryptBlocks(byte[] in, byte[] expandedKeys, int rounds, int offset, int len);
 
     static boolean isAvailable() {
         return AVAILABLE;
     }
 
-    private static byte[] crypt(byte[] in, KeySchedule ks, int off) {
+    private static byte[] crypt(byte[] in, KeySchedule ks, int offset) {
 
         int rounds = ks.getNr();
 
-        encryptBlock(in, ksToArray(ks), rounds, off);
+        encryptBlock(in, ksToArray(ks), rounds, offset);
 
         return in;
     }
 
-    private static byte[] decrypt(byte[] in, KeySchedule ks, int off) {
+    private static byte[] decrypt(byte[] in, KeySchedule ks, int offset) {
 
         int rounds = ks.getNr();
         
-        decryptBlock(in, ksToArray(ks), rounds, off);
+        decryptBlock(in, ksToArray(ks), rounds, offset);
 
         return in;
     }
@@ -50,8 +52,19 @@ public class AESWC {
         return keys;
     }
 
-    public static byte[] ccrypt(boolean mode, byte[] s, KeySchedule ks, int off){
-        return mode ? crypt(s, ks, off) : decrypt(s, ks, off);
+    public static byte[] ccrypt(boolean mode, byte[] s, KeySchedule ks, int offset){
+        return mode ? crypt(s, ks, offset) : decrypt(s, ks, offset);
+    }
+
+    public static void ccryptBlocks(boolean mode, byte[] s, KeySchedule ks, int offset, int len) {
+        int rounds = ks.getNr();
+        byte[] expandedKeys = ksToArray(ks);
+
+        if (mode) {
+            encryptBlocks(s, expandedKeys, rounds, offset, len);
+        } else {
+            decryptBlocks(s, expandedKeys, rounds, offset, len);
+        }
     }
 
 }

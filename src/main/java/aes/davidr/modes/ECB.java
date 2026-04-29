@@ -15,7 +15,7 @@ public final class ECB{
     public static byte[] ecbProcessBlock(boolean mode, byte[] in, KeySchedule ks, int offset) {
         if(offset<0)throw new IllegalArgumentException("bad offset negative");
         if((in.length-offset)<16)throw new IllegalArgumentException("too small of an input");
-        ecbProcessBlocks(mode, in, ks, 0, 16);
+        ecbProcessBlocks(mode, in, ks, offset, 16);
         return in;
     }
 
@@ -30,9 +30,7 @@ public final class ECB{
         if ((len & (BLOCK - 1)) != 0) // if len is multiple of 16, its last 4 bits are 0 len & 15 will be 0 only for
                                       // multiples of 16
             throw new IllegalArgumentException("len must be multiple of 16");
-        for (int off = offset; off < (offset + len); off += BLOCK) {
-            AES.blockRun(mode, in, ks, off);
-        }
+        AES.blocksRun(mode, in, ks, offset, len);
     }
 
     private static byte[] ecbEncryptAny(byte[] plaintext, KeySchedule ks) {

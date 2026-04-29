@@ -71,13 +71,7 @@ public class AESCompareAll extends AES{
         if (in.length % 16 != 0) throw new IllegalArgumentException("len % 16 != 0");
 
         byte[] out = Arrays.copyOf(in, in.length);
-        // byte[] block = new byte[16];
-
-        for (int off = 0; off < out.length; off += 16) {
-            // System.arraycopy(out, off, block, 0, 16);
-            AES.blockRun(encrypt, out, ks, off);
-            // System.arraycopy(block, 0, out, off, 16);
-        }
+        AES.blocksRun(encrypt, out, ks, 0, out.length);
         return out;
     }
 
@@ -104,12 +98,9 @@ public class AESCompareAll extends AES{
             final int s = start;
             final int e = Math.min(out.length, s + taskBytes);
             futures.add(pool.submit(() -> {
-                // byte[] block = new byte[16];
-                for (int off = s; off < e; off += 16) {
-                    // System.arraycopy(out, off, block, 0, 16);
-                    AES.blockRun(encrypt, out, ks, off);
-                    // System.arraycopy(block, 0, out, off, 16);
-                }
+                byte[] chunk = Arrays.copyOfRange(out, s, e);
+                AES.blocksRun(encrypt, chunk, ks, 0, chunk.length);
+                System.arraycopy(chunk, 0, out, s, chunk.length);
             }));
         }
 

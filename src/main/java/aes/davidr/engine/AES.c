@@ -14,18 +14,7 @@ static void make_decrypt_keys(const uint8_t *ek, __m128i *dk, int rounds) {
     dk[rounds] = _mm_loadu_si128((const __m128i *)(ek + 0));
 }
 
-JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_encryptBlock(
-    JNIEnv *env,
-    jclass cls,
-    jbyteArray inArr,
-    jbyteArray keyArr,
-    jint rounds,
-    jint offset
-) {
-    jbyte *data = (*env)->GetByteArrayElements(env, inArr, NULL);
-    jbyte *ptr = data + offset;
-    jbyte *key  = (*env)->GetByteArrayElements(env, keyArr, NULL);
-
+static void encrypt_one(uint8_t *ptr, const uint8_t *key, int rounds) {
     __m128i block = _mm_loadu_si128((const __m128i *)ptr);
 
     block = _mm_xor_si128(block, _mm_loadu_si128((const __m128i *)(key + 0)));
@@ -41,6 +30,35 @@ JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_encryptBlock(
     );
 
     _mm_storeu_si128((__m128i *)ptr, block);
+}
+
+static void decrypt_one(uint8_t *ptr, const __m128i *dk, int rounds) {
+    __m128i block = _mm_loadu_si128((const __m128i *)ptr);
+
+    block = _mm_xor_si128(block, dk[0]);
+
+    for (int r = 1; r < rounds; r++) {
+        block = _mm_aesdec_si128(block, dk[r]);
+    }
+
+    block = _mm_aesdeclast_si128(block, dk[rounds]);
+
+    _mm_storeu_si128((__m128i *)ptr, block);
+}
+
+JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_encryptBlock(
+    JNIEnv *env,
+    jclass cls,
+    jbyteArray inArr,
+    jbyteArray keyArr,
+    jint rounds,
+    jint offset
+) {
+    jbyte *data = (*env)->GetByteArrayElements(env, inArr, NULL);
+    jbyte *ptr = data + offset;
+    jbyte *key  = (*env)->GetByteArrayElements(env, keyArr, NULL);
+
+    encrypt_one((uint8_t *)ptr, (const uint8_t *)key, rounds);
 
     (*env)->ReleaseByteArrayElements(env, inArr, data, 0);
     (*env)->ReleaseByteArrayElements(env, keyArr, key, JNI_ABORT);
@@ -61,17 +79,50 @@ JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_decryptBlock(
     __m128i dk[15];
     make_decrypt_keys((const uint8_t *)key, dk, rounds);
 
-    __m128i block = _mm_loadu_si128((const __m128i *)ptr);
+    decrypt_one((uint8_t *)ptr, dk, rounds);
 
-    block = _mm_xor_si128(block, dk[0]);
+    (*env)->ReleaseByteArrayElements(env, inArr, data, 0);
+    (*env)->ReleaseByteArrayElements(env, keyArr, key, JNI_ABORT);
+}
 
-    for (int r = 1; r < rounds; r++) {
-        block = _mm_aesdec_si128(block, dk[r]);
+JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_encryptBlocks(
+    JNIEnv *env,
+    jclass cls,
+    jbyteArray inArr,
+    jbyteArray keyArr,
+    jint rounds,
+    jint offset,
+    jint len
+) {
+    jbyte *data = (*env)->GetByteArrayElements(env, inArr, NULL);
+    jbyte *key = (*env)->GetByteArrayElements(env, keyArr, NULL);
+
+    for (jint off = offset; off < offset + len; off += 16) {
+        encrypt_one((uint8_t *)(data + off), (const uint8_t *)key, rounds);
     }
 
-    block = _mm_aesdeclast_si128(block, dk[rounds]);
+    (*env)->ReleaseByteArrayElements(env, inArr, data, 0);
+    (*env)->ReleaseByteArrayElements(env, keyArr, key, JNI_ABORT);
+}
 
-    _mm_storeu_si128((__m128i *)ptr, block);
+JNIEXPORT void JNICALL Java_aes_davidr_engine_AESWC_decryptBlocks(
+    JNIEnv *env,
+    jclass cls,
+    jbyteArray inArr,
+    jbyteArray keyArr,
+    jint rounds,
+    jint offset,
+    jint len
+) {
+    jbyte *data = (*env)->GetByteArrayElements(env, inArr, NULL);
+    jbyte *key = (*env)->GetByteArrayElements(env, keyArr, NULL);
+
+    __m128i dk[15];
+    make_decrypt_keys((const uint8_t *)key, dk, rounds);
+
+    for (jint off = offset; off < offset + len; off += 16) {
+        decrypt_one((uint8_t *)(data + off), dk, rounds);
+    }
 
     (*env)->ReleaseByteArrayElements(env, inArr, data, 0);
     (*env)->ReleaseByteArrayElements(env, keyArr, key, JNI_ABORT);

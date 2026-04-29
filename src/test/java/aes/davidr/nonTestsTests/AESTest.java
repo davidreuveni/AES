@@ -10,7 +10,7 @@ import aes.davidr.engine.KeySchedule;
 
 public class AESTest {
 
-    private static final int SIZE_MB = 512; 
+    private static final int SIZE_MB = 1024; 
 
     public static void main(String[] args) throws Exception {
         testRandomRounds(200); // random round-trip tests
@@ -54,35 +54,32 @@ public class AESTest {
     private static void benchmarkAES(int megabytes) {
         final int BLOCK = 16; // AES block size
         final long totalBytes = (long) megabytes * 1024 * 1024;
-        final long blocks = totalBytes / BLOCK;
+        if (totalBytes > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("benchmark buffer is too large for one Java byte array");
+        }
 
         SecureRandom rnd = new SecureRandom();
         byte[] key = new byte[16];
         rnd.nextBytes(key);
 
-        // Single state we mutate each iteration (keeps allocations low)
-        byte[] state = randomState(rnd);
+        byte[] state = new byte[(int) totalBytes];
+        rnd.nextBytes(state);
 
         KeySchedule ke = new KeySchedule(key);
 
-        // Reset state after warmup
-        state = randomState(rnd);
+        byte[] warmup = new byte[1024 * 1024];
+        rnd.nextBytes(warmup);
+        AES.blocksRun(AES.ENCRYPT_MODE, warmup, ke, 0, warmup.length);
+        AES.blocksRun(AES.DECRYPT_MODE, warmup, ke, 0, warmup.length);
 
         // --- Measure ENCRYPT ---
         long t0 = System.nanoTime();
-        for (long i = 0; i < blocks; i++) {
-            AES.blockRun(AES.ENCRYPT_MODE, state, ke);
-        }
+        AES.blocksRun(AES.ENCRYPT_MODE, state, ke, 0, state.length);
         long t1 = System.nanoTime();
 
         // --- Measure DECRYPT ---
-        for (int i = 0; i < 4; i++) { // re-randomize state a bit
-            state = randomState(rnd);
-        }
         long t2 = System.nanoTime();
-        for (long i = 0; i < blocks; i++) {
-            AES.blockRun(AES.DECRYPT_MODE, state, ke);
-        }
+        AES.blocksRun(AES.DECRYPT_MODE, state, ke, 0, state.length);
         long t3 = System.nanoTime();
 
         double encSec = (t1 - t0) / 1e9;
