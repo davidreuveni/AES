@@ -6,28 +6,51 @@
       "name": "Main",
       "request": "launch",
       "mainClass": "aes.davidr.nonTestsTests.Main",
-      "projectName": "engine"
+      "projectName": "engine",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}"
     },
     {
       "type": "java",
       "name": "EncryptFile",
       "request": "launch",
       "mainClass": "aes.davidr.nonTestsTests.EncryptFile",
-      "projectName": "engine"
+      "projectName": "engine",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}"
     },
     {
       "type": "java",
       "name": "Main",
       "request": "launch",
       "mainClass": "aes.davidr.Main",
-      "projectName": "engine"
+      "projectName": "engine",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}"
     },
     {
       "type": "java",
       "name": "AESTest",
       "request": "launch",
       "mainClass": "aes.davidr.nonTestsTests.AESTest",
-      "projectName": "engine"
+      "projectName": "engine",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}"
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": true,
+      "cwd": "c:/vs/engine/src/main/java/aes/davidr/engine",
+      "program": "c:/vs/engine/src/main/java/aes/davidr/engine/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
     }
   ]
 }

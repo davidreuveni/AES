@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import aes.davidr.engine.AES;
 import aes.davidr.engine.KeySchedule;
 import aes.davidr.fileCrypto.FileECB;
 import aes.davidr.fileCrypto.HMAC;
 import aes.davidr.modes.ECB;
+import aes.davidr.modes.Padding;
 
 /**
  * Public-facing AES API for byte-array and file encryption/decryption operations.
@@ -169,10 +171,56 @@ public final class AesCipher {
      * @param in source input stream
      * @param out destination output stream
      * @param key raw key bytes used to derive encryption and MAC keys
-     * @throws Exception if stream processing fails or authentication validation fails during decryption
+     * @throws IllegalArgumentException if {@code in}, {@code out}, or {@code key} is {@code null},
+     *         or if {@code key} is not 16, 24, or 32 bytes when the HMAC path derives the AES key schedule
+     * @throws java.io.EOFException if decryption reaches end of stream before the authenticated header is fully read
+     * @throws IOException if reading from {@code in}, writing to {@code out}, creating or reading the temporary
+     *         ciphertext spool file fails, if the encrypted stream header is invalid, or if the input is too short
+     *         to contain the trailing HMAC tag
+     * @throws SecurityException if HMAC verification fails during decryption, usually because the ciphertext
+     *         was modified or the wrong key was supplied
+     * @throws java.security.NoSuchAlgorithmException if the runtime does not provide SHA-256 or HmacSHA256
+     * @throws java.security.InvalidKeyException if the derived HMAC key cannot initialize the HMAC engine
      */
     public static void cipherStream(boolean encrypt, InputStream in, OutputStream out, byte[] key) throws Exception {
         HMAC.cipherStream(encrypt, in, out, key);
+    }
+
+    /**
+     * Processes stream data using AES-ECB with an appended HMAC-SHA256 authentication tag.
+     * In encrypt mode, the method writes container fields, ciphertext, and tag to {@code out}.
+     * In decrypt mode, the method verifies authenticity before emitting plaintext.
+     *
+     * @param encrypt use {@link #ENCRYPT_MODE} to encrypt or {@link #DECRYPT_MODE} to decrypt
+     * @param hmac use {@code true} to process with hmac. use {@code false} for regular processing
+     * @param in source input stream
+     * @param out destination output stream
+     * @param key raw key bytes used to derive encryption and MAC keys
+     * @throws IllegalArgumentException if {@code key} is {@code null}; if {@code hmac} is {@code true}, also if
+     *         {@code in} or {@code out} is {@code null}; if {@code hmac} is {@code false}, also if the key-derived
+     *         schedule cannot be created or decrypted plaintext has invalid PKCS#7 padding
+     * @throws java.io.EOFException if {@code hmac} is {@code true} and decryption reaches end of stream before the
+     *         authenticated header is fully read
+     * @throws IOException if reading from {@code in}, writing to {@code out}, creating or reading the temporary
+     *         ciphertext spool file fails, if the encrypted input is not block-aligned or is empty in regular
+     *         decrypt mode, if the authenticated stream header is invalid in HMAC mode, or if the input is too
+     *         short to contain the trailing HMAC tag
+     * @throws SecurityException if {@code hmac} is {@code true} and HMAC verification fails during decryption,
+     *         usually because the ciphertext was modified or the wrong key was supplied
+     * @throws java.security.NoSuchAlgorithmException if {@code hmac} is {@code true} and the runtime does not
+     *         provide SHA-256 or HmacSHA256
+     * @throws java.security.InvalidKeyException if {@code hmac} is {@code true} and the derived HMAC key cannot
+     *         initialize the HMAC engine
+     */
+    public static void cipherStream(boolean encrypt, boolean hmac, InputStream in, OutputStream out, byte[] key) throws Exception {
+        if (hmac){
+            HMAC.cipherStream(encrypt, in, out, key);
+        }
+        else {
+            if (encrypt) FileECB.encryptIStoOS(in, out, keyScheduleForBytes(key));
+            else FileECB.decryptIStoOS(in, out, keyScheduleForBytes(key));
+        }
+        
     }
 
     private static KeySchedule keyScheduleForBytes(byte[] key) {

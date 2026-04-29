@@ -181,6 +181,9 @@ public class AES {
     }
 
     public static byte[] blockRun(boolean mode, byte[] s, KeySchedule ks, int off) {
+        if (AESWC.isAvailable()) {
+            return AESWC.ccrypt(mode, s, ks, off);           
+        }
         return mode ? cryptBlock(s, ks, off) : decryptBlock(s, ks, off);
     }
 
@@ -189,3 +192,4 @@ public class AES {
     }
 
 }
+ 

@@ -10,7 +10,7 @@ import aes.davidr.engine.KeySchedule;
 
 public class AESTest {
 
-    private static final int SIZE_MB = 128; 
+    private static final int SIZE_MB = 512; 
 
     public static void main(String[] args) throws Exception {
         testRandomRounds(200); // random round-trip tests
